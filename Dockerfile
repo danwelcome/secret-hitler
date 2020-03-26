@@ -10,6 +10,6 @@ WORKDIR /secret-hitler
 COPY . .
 RUN yarn
 
-ENV MONGO_HOSTNAME localhost:27017
+ENV MONGO_HOSTNAME mongo:27017
 EXPOSE 8080
 CMD ["yarn", "dev"]
