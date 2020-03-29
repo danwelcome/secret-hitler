@@ -12,4 +12,4 @@ RUN yarn
 
 ENV MONGO_HOSTNAME mongo:27017
 EXPOSE 8080
-CMD ["yarn", "dev"]
+CMD ./wait-for $MONGO_HOSTNAME -- yarn dev
