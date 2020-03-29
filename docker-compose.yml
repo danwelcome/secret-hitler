@@ -1,0 +1,27 @@
+version: '3'
+services:
+  mongo:
+    container_name: mongo
+    image: mongo:latest
+    volumes:
+      - './data:/data/db'
+    networks:
+      - backend
+    restart: always
+
+  secret-hitler:
+    image: danwelcome/secret-hitler:latest
+    ports:
+      - '8080:8080'
+    networks:
+      - backend
+    restart: always
+    depends_on:
+      - mongo
+
+networks:
+  backend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.5.1.0/24
