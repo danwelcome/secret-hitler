@@ -26,8 +26,8 @@ if (process.env.NODE_ENV !== 'production') {
 	const redis = require('redis').createClient();
 	const RedisStore = require('connect-redis')(session);
 	store = new RedisStore({
-		host: '127.0.0.1',
-		port: 6379,
+		host: process.env.REDIS_HOSTNAME,
+		port: process.env.REDIS_PORT,
 		client: redis,
 		ttl: 2 * 604800 // 2 weeks
 	});
