@@ -62,8 +62,8 @@ let modUserNames = [],
 
 const gamesGarbageCollector = () => {
 	const currentTime = new Date();
-	let toDelete = false;
 	Object.keys(games).forEach(gameName => {
+		let toDelete = false;
 		const currentGame = games[gameName];
 		const createdTimer =
 			currentGame &&
@@ -72,9 +72,13 @@ const gamesGarbageCollector = () => {
 			currentGame.gameState &&
 			!currentGame.gameState.isStarted &&
 			new Date(currentGame.general.timeCreated.getTime() + 600000);
-		const completedTimer = currentGame && currentGame.general && currentGame.general.timeStarted && currentGame.gameState && currentGame.gameState.isCompleted;
-		// For later addition
-		// && new Date(games[gameName].general.timeStarted + 000);
+		const completedTimer =
+			currentGame &&
+			currentGame.general &&
+			currentGame.general.timeStarted &&
+			currentGame.gameState &&
+			currentGame.gameState.isCompleted &&
+			new Date(games[gameName].general.timeStarted + 0);
 
 		// To come maybe later
 		// const modDeleteTimer = games[gameName].general.modDeleteDelay && new Date(games[gameName].general.modDeleteDelay.getTime() + 900000);
@@ -118,8 +122,10 @@ const gamesGarbageCollector = () => {
 				if (!io.sockets.sockets[affectedSocketId]) {
 					continue;
 				}
-				io.sockets.sockets[affectedSocketId].emit('toLobby');
-				io.sockets.sockets[affectedSocketId].leave(gameName);
+
+				// I'm entirely unsure why socketio seems to misbehave with these combined so often - probably just bad timing
+				if (io.sockets.sockets && io.sockets.sockets[affectedSocketId]) io.sockets.sockets[affectedSocketId].emit('toLobby');
+				if (io.sockets.sockets && io.sockets.sockets[affectedSocketId]) io.sockets.sockets[affectedSocketId].leave(gameName);
 			}
 			delete games[gameName];
 			sendGameList();
@@ -188,6 +194,7 @@ module.exports.socketRoutes = () => {
 
 			let isAEM = false;
 			let isTrial = false;
+			let isTourneyMod = false;
 
 			if (authenticated && passport && passport.user) {
 				Account.findOne({ username: passport.user }).then(account => {
@@ -201,6 +208,7 @@ module.exports.socketRoutes = () => {
 						isAEM = true;
 					}
 					if (account.staffRole && account.staffRole.length > 0 && account.staffRole === 'trialmod') isTrial = true;
+					if (account.isTournamentMod) isTourneyMod = true;
 				});
 			}
 
@@ -294,7 +302,11 @@ module.exports.socketRoutes = () => {
 			});
 
 			socket.on('sendUser', user => {
-				sendSpecificUserList(socket, user.staffRole);
+				if (authenticated && isAEM) {
+					sendSpecificUserList(socket, 'moderator');
+				} else {
+					sendSpecificUserList(socket);
+				}
 			});
 
 			socket.on('flappyEvent', data => {
@@ -387,7 +399,7 @@ module.exports.socketRoutes = () => {
 				const game = findGame(data);
 				if (isRestricted) return;
 				if (authenticated) {
-					handleAddNewGameChat(socket, passport, data, game, modUserNames, editorUserNames, adminUserNames, handleAddNewClaim);
+					handleAddNewGameChat(socket, passport, data, game, modUserNames, editorUserNames, adminUserNames, handleAddNewClaim, isTourneyMod);
 				}
 			});
 			socket.on('updateReportGame', data => {
@@ -411,6 +423,7 @@ module.exports.socketRoutes = () => {
 
 			socket.on('addNewGeneralChat', data => {
 				if (isRestricted) return;
+
 				if (authenticated) {
 					handleNewGeneralChat(socket, passport, data, modUserNames, editorUserNames, adminUserNames);
 				}
@@ -483,12 +496,12 @@ module.exports.socketRoutes = () => {
 			});
 			socket.on('getModInfo', count => {
 				if (authenticated && (isAEM || isTrial)) {
-					sendModInfo(games, socket, count, isTrial && !isAEM);
+					sendModInfo(games, socket, count, isTrial, isAEM);
 				}
 			});
 			socket.on('subscribeModChat', uid => {
-				if (authenticated && isAEM) {
-					const game = findGame({ uid });
+				const game = findGame({ uid });
+				if (authenticated && (isAEM || (isTourneyMod && game.general.unlisted))) {
 					if (game && game.private && game.private.seatedPlayers) {
 						const players = game.private.seatedPlayers.map(player => player.userName);
 						Account.find({ staffRole: { $exists: true, $ne: 'veteran' } }).then(accounts => {
@@ -508,24 +521,24 @@ module.exports.socketRoutes = () => {
 			});
 			socket.on('modPeekVotes', data => {
 				const uid = data.uid;
-				if (authenticated && isAEM) {
-					const game = findGame({ uid });
+				const game = findGame({ uid });
+				if (authenticated && (isAEM || (isTourneyMod && game.general.unlisted))) {
 					if (game && game.private && game.private.seatedPlayers) {
 						handleModPeekVotes(socket, passport, game, data.modName);
+					} else {
+						socket.emit('sendAlert', 'Game is missing.');
 					}
-				} else {
-					socket.emit('sendAlert', 'Game is missing.');
 				}
 			});
 			socket.on('modFreezeGame', data => {
 				const uid = data.uid;
-				if (authenticated && isAEM) {
-					const game = findGame({ uid });
+				const game = findGame({ uid });
+				if (authenticated && (isAEM || (isTourneyMod && game.general.unlisted))) {
 					if (game && game.private && game.private.seatedPlayers) {
 						handleGameFreeze(socket, passport, game, data.modName);
+					} else {
+						socket.emit('sendAlert', 'Game is missing.');
 					}
-				} else {
-					socket.emit('sendAlert', 'Game is missing.');
 				}
 			});
 			socket.on('getUserReports', () => {
