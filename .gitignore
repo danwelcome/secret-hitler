@@ -45,3 +45,6 @@ scripts/out/*
 public/images/emotesheet.png
 *.iml
 sample-docker-compose/data/*
+
+# Keep .gitkeep files, even in ignored directories
+!/**/.gitkeep
